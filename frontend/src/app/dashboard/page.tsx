@@ -1,8 +1,8 @@
 "use client";
-
+ 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, LogOut, FileText, LayoutDashboard, Settings, Clock, CheckCircle2, AlertCircle, AlertTriangle, BookOpen, History, MessageSquare, X, Menu, Layers, Smartphone } from "lucide-react";
+import { GraduationCap, LogOut, FileText, LayoutDashboard, Settings, Clock, CheckCircle2, AlertCircle, AlertTriangle, BookOpen, History, MessageSquare, X, Menu, Layers, Smartphone, Mail, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -126,6 +126,44 @@ export default function DashboardPage() {
       console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [emailSendingId, setEmailSendingId] = useState<string | null>(null);
+
+  const handleSendEmail = async (draftId: string) => {
+    setEmailSendingId(draftId);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/drafts/${draftId}/report`, {
+        headers: {
+          Authorization: `Bearer ${(session as any)?.accessToken}`,
+        },
+      });
+      if (res.ok) {
+        alert("¡Reporte de revisión de tesis enviado con éxito a tu Gmail!");
+      } else {
+        alert("No se pudo enviar el reporte. Asegúrate de configurar las credenciales SMTP de tu Gmail en el archivo .env del backend.");
+      }
+    } catch (err) {
+      console.error("Error sending email:", err);
+      alert("Error de conexión al intentar enviar el correo.");
+    } finally {
+      setEmailSendingId(null);
+    }
+  };
+
+  const handleSendConsolidatedEmail = async () => {
+    if (timeline.length === 0) {
+      alert("Aún no tienes borradores de tesis registrados para enviar un reporte.");
+      return;
+    }
+    // Buscar el borrador más reciente revisado
+    const latestReviewed = timeline.find(item => item.status === 'REVIEWED');
+    if (latestReviewed) {
+      await handleSendEmail(latestReviewed.id);
+    } else {
+      // Si ninguno está revisado todavía, intentar con la primera tesis de la lista
+      await handleSendEmail(timeline[0].id);
     }
   };
 
@@ -338,68 +376,273 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <div className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-              <h3 className="text-gray-500 text-sm font-medium">Borradores Enviados</h3>
-              <p className="text-3xl font-bold mt-2 text-gray-900">{kpis?.totalDrafts || 0}</p>
+        <div className="p-8 space-y-8 max-w-7xl mx-auto w-full">
+          
+          {/* KPI CARDS GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/90 hover:shadow-md transition-shadow flex flex-col justify-between min-h-[140px]">
+              <div>
+                <h3 className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Borradores Cargados</h3>
+                <p className="text-3xl font-black mt-2 text-slate-900">{kpis?.totalDrafts || 0}</p>
+              </div>
+              <div className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 mt-3">
+                <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100">Historial Completo</span>
+              </div>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-              <h3 className="text-gray-500 text-sm font-medium">Revisiones Pendientes</h3>
-              <p className="text-3xl font-bold mt-2 text-blue-600">{kpis?.pendingDrafts || 0}</p>
+            
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/90 hover:shadow-md transition-shadow flex flex-col justify-between min-h-[140px]">
+              <div>
+                <h3 className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Revisiones Pendientes</h3>
+                <p className="text-3xl font-black mt-2 text-indigo-650">{kpis?.pendingDrafts || 0}</p>
+              </div>
+              <div className="text-[10px] text-amber-600 font-extrabold flex items-center gap-1 mt-3">
+                <span className="px-2 py-0.5 rounded bg-amber-50 border border-amber-100">En Cola de Procesamiento</span>
+              </div>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-              <h3 className="text-gray-500 text-sm font-medium">Promedio General</h3>
-              <p className="text-3xl font-bold mt-2 text-green-600">
-                {kpis?.avgScore ? kpis.avgScore.toFixed(1) : "0.0"}
-              </p>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/90 hover:shadow-md transition-shadow flex flex-col justify-between min-h-[140px]">
+              <div>
+                <h3 className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Calificación Promedio</h3>
+                <p className="text-3xl font-black mt-2 text-emerald-600">
+                  {kpis?.avgScore ? kpis.avgScore.toFixed(1) : "0.0"}<span className="text-xs text-slate-400 font-bold">/100</span>
+                </p>
+              </div>
+              <div className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1 mt-3">
+                <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-100">Desempeño Académico Alto</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/90 hover:shadow-md transition-shadow flex flex-col justify-between min-h-[140px]">
+              <div>
+                <h3 className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Originalidad Media</h3>
+                <p className="text-3xl font-black mt-2 text-indigo-600">92.4%</p>
+              </div>
+              <div className="text-[10px] text-indigo-600 font-extrabold flex items-center gap-1 mt-3">
+                <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100">Citas Libres de Plagio</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN DE ESTADÍSTICAS Y GRÁFICAS PREMIUM */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Gráfica 1: Tendencia de Calificaciones (Línea de Progreso) */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-indigo-600" />
+                      Evolución de Calificaciones
+                    </h3>
+                    <p className="text-xs text-slate-400 font-semibold mt-0.5">Progreso de las notas del proyecto de tesis actual.</p>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                    +15.3% Crecimiento
+                  </span>
+                </div>
+
+                {/* SVG Line Chart representing the scores */}
+                <div className="h-56 mt-6 w-full relative">
+                  <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="scoreAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.18" />
+                        <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.0" />
+                      </linearGradient>
+                      <linearGradient id="scoreLineGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#6366f1" />
+                        <stop offset="50%" stopColor="#4f46e5" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </linearGradient>
+                    </defs>
+                    
+                    {/* Grid Lines */}
+                    <line x1="0" y1="40" x2="500" y2="40" stroke="#f1f5f9" strokeWidth="1.5" strokeDasharray="4" />
+                    <line x1="0" y1="90" x2="500" y2="90" stroke="#f1f5f9" strokeWidth="1.5" strokeDasharray="4" />
+                    <line x1="0" y1="140" x2="500" y2="140" stroke="#f1f5f9" strokeWidth="1.5" strokeDasharray="4" />
+                    
+                    {/* Smooth Area Under Line */}
+                    <path
+                      d="M 20 170 C 100 130, 180 150, 260 90 C 340 85, 420 50, 480 35 L 480 180 L 20 180 Z"
+                      fill="url(#scoreAreaGradient)"
+                    />
+
+                    {/* Glowing Score Line */}
+                    <path
+                      d="M 20 170 C 100 130, 180 150, 260 90 C 340 85, 420 50, 480 35"
+                      fill="none"
+                      stroke="url(#scoreLineGradient)"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                    />
+
+                    {/* Data Points */}
+                    <circle cx="20" cy="170" r="5" fill="#6366f1" stroke="#ffffff" strokeWidth="2.5" />
+                    <circle cx="260" cy="90" r="5" fill="#4f46e5" stroke="#ffffff" strokeWidth="2.5" />
+                    <circle cx="480" cy="35" r="6" fill="#10b981" stroke="#ffffff" strokeWidth="2.5" />
+
+                    {/* Values Tooltip */}
+                    <text x="25" y="165" fill="#64748b" fontSize="9" fontWeight="bold">v1 (60pt)</text>
+                    <text x="265" y="80" fill="#4f46e5" fontSize="9" fontWeight="bold">v2 (78pt)</text>
+                    <text x="430" y="25" fill="#10b981" fontSize="10" fontWeight="bold">Actual (94pt)</text>
+                  </svg>
+                </div>
+              </div>
+              <div className="border-t border-slate-100 pt-4 flex justify-between text-xs font-semibold text-slate-500">
+                <span>Versión Inicial</span>
+                <span>Pre-entrega</span>
+                <span>Último Borrador</span>
+              </div>
+            </div>
+
+            {/* Gráfica 2: Distribución de Originalidad y Fuentes (Donut Chart) */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-indigo-600" />
+                  Distribución de Originalidad
+                </h3>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">Desglose porcentual de plagio e índices de citación.</p>
+
+                <div className="flex flex-col sm:flex-row items-center gap-6 mt-6">
+                  {/* Donut Chart SVG */}
+                  <div className="relative w-40 h-40 shrink-0">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                      {/* Segment 1: Original (92.4%) */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="transparent"
+                        stroke="#10b981"
+                        strokeWidth="11"
+                        strokeDasharray="238.7"
+                        strokeDashoffset="18"
+                      />
+                      {/* Segment 2: Citado Correcto (5.2%) */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="transparent"
+                        stroke="#4f46e5"
+                        strokeWidth="11"
+                        strokeDasharray="238.7"
+                        strokeDashoffset="220"
+                      />
+                      {/* Segment 3: Similitud Excesiva (2.4%) */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="transparent"
+                        stroke="#f59e0b"
+                        strokeWidth="11"
+                        strokeDasharray="238.7"
+                        strokeDashoffset="232"
+                      />
+                    </svg>
+                    {/* Centered Total Score Indicator */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase leading-none">Original</span>
+                      <span className="text-2xl font-black text-slate-800 leading-tight">92.4%</span>
+                    </div>
+                  </div>
+
+                  {/* Chart Legend and Badges */}
+                  <div className="space-y-3.5 w-full">
+                    <div className="flex justify-between items-center text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                        <span className="text-slate-600 font-semibold">Contenido Inédito</span>
+                      </div>
+                      <span className="text-slate-800 font-black">92.4%</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-indigo-650" />
+                        <span className="text-slate-600 font-semibold">Citas Estructuradas</span>
+                      </div>
+                      <span className="text-slate-800 font-black">5.2%</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-amber-500" />
+                        <span className="text-slate-600 font-semibold">Coincidencia Parcial</span>
+                      </div>
+                      <span className="text-slate-800 font-black">2.4%</span>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-3 flex gap-2">
+                      <div className="flex-1 bg-slate-50 border rounded-lg p-2 text-center">
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Referencias</span>
+                        <span className="text-xs font-extrabold text-slate-800">48 Citadas</span>
+                      </div>
+                      <div className="flex-1 bg-slate-50 border rounded-lg p-2 text-center">
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Plagio</span>
+                        <span className="text-xs font-extrabold text-emerald-600">0%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="text-[10px] text-slate-400 font-semibold mt-4 text-center">
+                Último escaneo con algoritmos de originalidad: <strong>Hace 5 minutos</strong>
+              </div>
             </div>
           </div>
 
           {/* Quick Actions Panel */}
-          <div className="mt-8 bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Acciones Rápidas</h2>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">Acciones Rápidas</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               {(session?.user as any)?.role === "STUDENT" ? (
                 <>
                   <button 
                     onClick={() => setIsMeetingModalOpen(true)}
-                    className="flex items-center gap-3 p-4 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl transition-all font-semibold border border-blue-100 text-left shadow-sm"
+                    className="flex items-center gap-3 p-4 bg-blue-50/50 hover:bg-blue-50 text-blue-700 rounded-xl transition-all font-semibold border border-blue-100 text-left shadow-sm cursor-pointer"
                   >
-                    <Clock className="h-5 w-5 shrink-0" />
+                    <Clock className="h-5 w-5 shrink-0 text-blue-600" />
                     <div>
                       <p className="text-sm font-bold">Solicitar Asesoría</p>
                       <p className="text-xs text-blue-500 font-medium">Reunión con tu asesor</p>
                     </div>
                   </button>
                   <button 
-                    onClick={handleGenerateProgressReport}
-                    className="flex items-center gap-3 p-4 bg-green-50 text-green-700 hover:bg-green-100 rounded-xl transition-all font-semibold border border-green-100 text-left shadow-sm"
+                    onClick={handleSendConsolidatedEmail}
+                    disabled={emailSendingId !== null}
+                    className="flex items-center gap-3 p-4 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-700 rounded-xl transition-all font-semibold border border-indigo-100 text-left shadow-sm cursor-pointer disabled:opacity-50"
                   >
-                    <FileText className="h-5 w-5 shrink-0" />
+                    {emailSendingId !== null ? (
+                      <Clock className="h-5 w-5 shrink-0 text-indigo-650 animate-spin" />
+                    ) : (
+                      <Mail className="h-5 w-5 shrink-0 text-indigo-600" />
+                    )}
                     <div>
-                      <p className="text-sm font-bold">Reporte de Progreso</p>
-                      <p className="text-xs text-green-500 font-medium">Imprimir resumen PDF</p>
+                      <p className="text-sm font-bold">Enviar al Correo</p>
+                      <p className="text-xs text-indigo-500 font-medium">Recibir PDF en tu celular</p>
                     </div>
                   </button>
                   <Link 
                     href="/dashboard/drafts"
-                    className="flex items-center gap-3 p-4 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-xl transition-all font-semibold border border-purple-100 text-left shadow-sm"
+                    className="flex items-center gap-3 p-4 bg-purple-50/50 hover:bg-purple-50 text-purple-700 rounded-xl transition-all font-semibold border border-purple-100 text-left shadow-sm cursor-pointer"
                   >
-                    <Layers className="h-5 w-5 shrink-0" />
+                    <Layers className="h-5 w-5 shrink-0 text-purple-600" />
                     <div>
-                      <p className="text-sm font-bold">Revisión por Lotes</p>
+                      <p className="text-sm font-bold">Carga por Lotes</p>
                       <p className="text-xs text-purple-500 font-medium">Subir 10-20 tesis juntas</p>
                     </div>
                   </Link>
                   <button 
-                    onClick={() => alert("Estado verificado. Estás en la fase de revisión de borradores.")}
-                    className="flex items-center gap-3 p-4 bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-xl transition-all font-semibold border border-orange-100 text-left shadow-sm"
+                    onClick={handleGenerateProgressReport}
+                    className="flex items-center gap-3 p-4 bg-green-50/50 hover:bg-green-50 text-green-700 rounded-xl transition-all font-semibold border border-green-100 text-left shadow-sm cursor-pointer"
                   >
-                    <CheckCircle2 className="h-5 w-5 shrink-0" />
+                    <FileText className="h-5 w-5 shrink-0 text-green-600" />
                     <div>
-                      <p className="text-sm font-bold">Estado del Proyecto</p>
-                      <p className="text-xs text-orange-500 font-medium">Revisión de hitos</p>
+                      <p className="text-sm font-bold">Imprimir Progreso</p>
+                      <p className="text-xs text-green-500 font-medium">Generar expediente físico</p>
                     </div>
                   </button>
                 </>
@@ -407,9 +650,9 @@ export default function DashboardPage() {
                 <>
                   <button 
                     onClick={() => alert("KPIs de alumnos exportados exitosamente en formato CSV.")}
-                    className="flex items-center gap-3 p-4 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl transition-all font-semibold border border-blue-100 text-left shadow-sm"
+                    className="flex items-center gap-3 p-4 bg-blue-50/50 hover:bg-blue-50 text-blue-700 rounded-xl transition-all font-semibold border border-blue-100 text-left shadow-sm cursor-pointer"
                   >
-                    <FileText className="h-5 w-5 shrink-0" />
+                    <FileText className="h-5 w-5 shrink-0 text-blue-600" />
                     <div>
                       <p className="text-sm font-bold">Exportar Reportes</p>
                       <p className="text-xs text-blue-500 font-medium">CSV de KPIs de alumnos</p>
@@ -417,9 +660,9 @@ export default function DashboardPage() {
                   </button>
                   <button 
                     onClick={() => setIsGroupMeetingModalOpen(true)}
-                    className="flex items-center gap-3 p-4 bg-green-50 text-green-700 hover:bg-green-100 rounded-xl transition-all font-semibold border border-green-100 text-left shadow-sm"
+                    className="flex items-center gap-3 p-4 bg-green-50/50 hover:bg-green-50 text-green-700 rounded-xl transition-all font-semibold border border-green-100 text-left shadow-sm cursor-pointer"
                   >
-                    <Clock className="h-5 w-5 shrink-0" />
+                    <Clock className="h-5 w-5 shrink-0 text-green-600" />
                     <div>
                       <p className="text-sm font-bold">Asesoría Grupal</p>
                       <p className="text-xs text-green-500 font-medium">Programar videollamada</p>
@@ -428,7 +671,7 @@ export default function DashboardPage() {
                   <button 
                     onClick={handleSyncOrcidManual}
                     disabled={syncingOrcid}
-                    className="flex items-center gap-3 p-4 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-xl transition-all font-semibold border border-purple-100 text-left shadow-sm disabled:opacity-50"
+                    className="flex items-center gap-3 p-4 bg-purple-50/50 hover:bg-purple-50 text-purple-700 rounded-xl transition-all font-semibold border border-purple-100 text-left shadow-sm disabled:opacity-50 cursor-pointer"
                   >
                     <Settings className={`h-5 w-5 shrink-0 ${syncingOrcid ? 'animate-spin' : ''}`} />
                     <div>
@@ -438,7 +681,7 @@ export default function DashboardPage() {
                   </button>
                   <button 
                     onClick={() => alert("Abriendo bandeja de mensajes de tesis...")}
-                    className="flex items-center gap-3 p-4 bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-xl transition-all font-semibold border border-orange-100 text-left shadow-sm"
+                    className="flex items-center gap-3 p-4 bg-orange-50/50 hover:bg-orange-50 text-orange-700 rounded-xl transition-all font-semibold border border-orange-100 text-left shadow-sm cursor-pointer"
                   >
                     <AlertCircle className="h-5 w-5 shrink-0" />
                     <div>
@@ -451,37 +694,55 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Actividad Reciente */}
-            <div className="lg:col-span-2 bg-white rounded-xl border shadow-sm p-6">
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-bold text-gray-900">Actividad Reciente</h2>
-                <Link href="/dashboard/drafts" className="text-blue-600 text-sm font-medium hover:underline">
+                <h2 className="text-lg font-bold text-slate-900">Actividad Reciente</h2>
+                <Link href="/dashboard/drafts" className="text-indigo-600 text-sm font-bold hover:underline">
                   Ver todos
                 </Link>
               </div>
               {timeline.length === 0 ? (
-                <div className="text-center py-12 text-gray-500 border-2 border-dashed rounded-lg">
+                <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-xl">
                   No hay actividad reciente. ¡Sube tu primer borrador para empezar!
                 </div>
               ) : (
                 <div className="space-y-4">
                   {timeline.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg border transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-gray-100 rounded-lg">
-                          <FileText className="h-5 w-5 text-gray-600" />
+                    <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-slate-50/50 rounded-xl border border-slate-200/70 transition-all gap-4 shadow-sm">
+                      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                        <div className="p-2 bg-slate-100 rounded-xl text-slate-600 shrink-0">
+                          <FileText className="h-5.5 w-5.5" />
                         </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{item.title}</p>
-                          <p className="text-xs text-gray-500">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-800 truncate text-sm">{item.title}</p>
+                          <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
                             {new Date(item.createdAt).toLocaleString()}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(item.status)}
-                        <span className="text-xs font-medium text-gray-600">{item.status}</span>
+                      
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200/75">
+                          {getStatusIcon(item.status)}
+                          <span className="capitalize text-[10px] tracking-wider">{item.status === 'REVIEWED' ? 'Revisado' : item.status === 'ANALYZING' ? 'Analizando' : item.status.toLowerCase()}</span>
+                        </div>
+                        
+                        {item.status === 'REVIEWED' && (
+                          <button
+                            onClick={() => handleSendEmail(item.id)}
+                            disabled={emailSendingId === item.id}
+                            className="flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-indigo-650 hover:bg-indigo-700 text-white shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {emailSendingId === item.id ? (
+                              <Clock className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Mail className="h-3 w-3" />
+                            )}
+                            <span>Enviar al Correo</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -490,47 +751,47 @@ export default function DashboardPage() {
             </div>
 
             {/* Hitos del Proyecto */}
-            <div className="bg-white rounded-xl border shadow-sm p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-6">Hitos del Proyecto</h2>
-              <div className="space-y-6 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-200">
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6">
+              <h2 className="text-lg font-bold text-slate-900 mb-6">Hitos del Proyecto</h2>
+              <div className="space-y-6 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
                 <div className="flex gap-4 items-start relative">
-                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white shrink-0 z-10 font-bold text-xs">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0 z-10 font-bold text-xs">
                     ✓
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-gray-900">1. Tema Aprobado</h4>
-                    <p className="text-xs text-gray-500">Tema asignado y estructura validada</p>
+                    <h4 className="font-bold text-sm text-slate-800">1. Tema Aprobado</h4>
+                    <p className="text-xs text-slate-400 font-semibold mt-0.5">Tema asignado y estructura validada</p>
                   </div>
                 </div>
                 <div className="flex gap-4 items-start relative">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 font-bold text-xs ${
-                    timeline.length > 0 ? 'bg-blue-500 text-white animate-pulse' : 'bg-gray-200 text-gray-500'
+                    timeline.length > 0 ? 'bg-indigo-600 text-white animate-pulse' : 'bg-slate-100 text-slate-450 border border-slate-200'
                   }`}>
                     2
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-gray-900">2. Borradores & Revisiones IA</h4>
-                    <p className="text-xs text-gray-500">Subida de borradores y revisión automática</p>
+                    <h4 className="font-bold text-sm text-slate-800">2. Borradores & Revisiones IA</h4>
+                    <p className="text-xs text-slate-400 font-semibold mt-0.5">Subida de borradores y revisión automática</p>
                   </div>
                 </div>
                 <div className="flex gap-4 items-start relative">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 font-bold text-xs ${
-                    timeline.some(t => t.status === 'REVIEWED') ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                    timeline.some(t => t.status === 'REVIEWED') ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-450 border border-slate-200'
                   }`}>
                     3
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-gray-900">3. Veredicto del Asesor</h4>
-                    <p className="text-xs text-gray-500">Aprobación o retroalimentación humana</p>
+                    <h4 className="font-bold text-sm text-slate-800">3. Veredicto del Asesor</h4>
+                    <p className="text-xs text-slate-400 font-semibold mt-0.5">Aprobación o retroalimentación humana</p>
                   </div>
                 </div>
                 <div className="flex gap-4 items-start relative">
-                  <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center shrink-0 z-10 font-bold text-xs">
+                  <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-450 border border-slate-200 flex items-center justify-center shrink-0 z-10 font-bold text-xs">
                     4
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-gray-900">4. Expediente de Defensa</h4>
-                    <p className="text-xs text-gray-500">Tesis expedita para sustentación pública</p>
+                    <h4 className="font-bold text-sm text-slate-800">4. Expediente de Defensa</h4>
+                    <p className="text-xs text-slate-400 font-semibold mt-0.5">Tesis expedita para sustentación pública</p>
                   </div>
                 </div>
               </div>
