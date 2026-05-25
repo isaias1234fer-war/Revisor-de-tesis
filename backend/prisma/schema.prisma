@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  ADVISOR
+  COORDINATOR
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          Role
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  studentProfile     StudentProfile?
+  advisorProfile     AdvisorProfile?
+  coordinatorProfile CoordinatorProfile?
+  adminProfile       AdminProfile?
+}
+
+model StudentProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  advisorId   String?
+  advisor     AdvisorProfile? @relation(fields: [advisorId], references: [id])
+  drafts      ThesisDraft[]
+}
+
+model AdvisorProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orcidId           String?  @unique
+  orcidAccessToken  String?
+  orcidRefreshToken String?
+  students          StudentProfile[]
+  publications      OrcidPublication[]
+}
+
+model CoordinatorProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ThesisDraft {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     StudentProfile @relation(fields: [studentId], references: [id])
+  title       String
+  version     Int      @default(1)
+  fileUrl     String
+  fileName    String
+  fileType    String
+  status      String   @default("PENDING") // PENDING, ANALYZING, REVIEWED, REJECTED, APPROVED
+  score       Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  aiReviews   AiReview[]
+  humanReviews HumanReview[]
+}
+
+model ThesisTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String? @db.Text
+  fileUrl     String
+  structure   Json     // Extracted structure: sections, limits, etc.
+  rubric      Json     // Evaluation rubric: weights, criteria
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AiReview {
+  id           String      @id @default(uuid())
+  draftId      String
+  draft        ThesisDraft @relation(fields: [draftId], references: [id])
+  findings     Json        // Organized findings by severity
+  score        Float
+  summary      String @db.Text
+  embedding    Json?       // Stored as JSON string for MySQL
+  createdAt    DateTime    @default(now())
+}
+
+model HumanReview {
+  id        String      @id @default(uuid())
+  draftId   String
+  draft     ThesisDraft @relation(fields: [draftId], references: [id])
+  advisorId String
+  comments  Json        // Comments by section
+  status    String      // APPROVED, REJECTED, CHANGES_REQUESTED
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model OrcidPublication {
+  id        String         @id @default(uuid())
+  advisorId String
+  advisor   AdvisorProfile @relation(fields: [advisorId], references: [id])
+  title     String @db.Text
+  year      Int?
+  doi       String?
+  journal   String? @db.Text
+  embedding Json?
+}
