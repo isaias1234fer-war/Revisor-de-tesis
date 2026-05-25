@@ -19,7 +19,9 @@ import {
   LogOut,
   X,
   Menu,
-  Smartphone
+  Smartphone,
+  Clock,
+  AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 
@@ -1025,7 +1027,7 @@ export default function SettingsPage() {
                     onClick={() => setActiveSimTab('settings')}
                     className={`flex flex-col items-center gap-0.5 cursor-pointer ${activeSimTab === 'settings' ? 'text-indigo-600 font-black' : 'text-slate-400'}`}
                   >
-                    <Settings className="h-3 w-3" />
+                    <SettingsIcon className="h-3 w-3" />
                     <span>Ajustes</span>
                   </div>
                 </div>
