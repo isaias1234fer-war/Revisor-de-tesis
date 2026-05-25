@@ -3,6 +3,8 @@ import { Job } from 'bullmq';
 import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { ReportsService } from '../reports/reports.service';
+import { EmailService } from '../email/email.service';
 const pdf = require('pdf-parse');
 
 @Processor('draft-processing')
@@ -11,6 +13,8 @@ export class DraftProcessor extends WorkerHost {
     private aiService: AiService,
     private prisma: PrismaService,
     private storageService: StorageService,
+    private reportsService: ReportsService,
+    private emailService: EmailService,
   ) {
     super();
   }
@@ -73,13 +77,39 @@ export class DraftProcessor extends WorkerHost {
       });
 
       // Update draft score and status
-      await this.prisma.thesisDraft.update({
+      const updatedDraftRecord = await this.prisma.thesisDraft.update({
         where: { id: draftId },
         data: { 
           score: analysis.score,
           status: 'REVIEWED'
         },
       });
+
+      // If a recipient email is assigned, send the report via email!
+      if (updatedDraftRecord.recipientEmail) {
+        try {
+          const updatedDraft = await this.prisma.thesisDraft.findUnique({
+            where: { id: draftId },
+            include: {
+              student: { include: { user: true } },
+              aiReviews: { orderBy: { createdAt: 'desc' }, take: 1 }
+            }
+          });
+          
+          if (updatedDraft) {
+            const pdfBuffer = await this.reportsService.generateDraftReport(updatedDraft);
+            await this.emailService.sendReport(
+              updatedDraft.recipientEmail,
+              updatedDraft.title,
+              analysis.score,
+              pdfBuffer,
+              updatedDraft.student?.user?.name || 'Estudiante',
+            );
+          }
+        } catch (mailError) {
+          console.error(`Error sending emailed report for draft ${draftId}:`, mailError.message);
+        }
+      }
 
     } catch (error) {
       console.error('Error processing draft', error);

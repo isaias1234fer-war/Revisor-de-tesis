@@ -65,6 +65,7 @@ export default function DraftsPage() {
 
   // Batch upload states
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchEmails, setBatchEmails] = useState<string[]>([]);
   const [batchUploading, setBatchUploading] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
   const [batchDrafts, setBatchDrafts] = useState<Draft[]>([]);
@@ -231,6 +232,7 @@ export default function DraftsPage() {
     // Create array of default titles (filename without extension)
     const fileTitles = batchFiles.map(file => file.name.replace(/\.[^/.]+$/, ""));
     formData.append("titles", JSON.stringify(fileTitles));
+    formData.append("emails", JSON.stringify(batchEmails));
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/drafts/upload-batch`, {
@@ -711,6 +713,7 @@ export default function DraftsPage() {
                       onChange={(e) => {
                         const files = Array.from(e.target.files || []);
                         setBatchFiles(files);
+                        setBatchEmails(new Array(files.length).fill(""));
                       }}
                       className="hidden"
                     />
@@ -749,15 +752,32 @@ export default function DraftsPage() {
                         </div>
                       )}
 
-                      {/* File item tags */}
-                      <div className="max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3.5 pr-2">
+                      {/* File item tags with email inputs for Gmail cell integration */}
+                      <div className="max-h-80 overflow-y-auto space-y-3 pr-2">
                         {batchFiles.map((file, idx) => (
-                          <div key={idx} className="bg-white px-3.5 py-2.5 rounded-lg border border-slate-200/80 flex justify-between items-center shadow-xs">
-                            <div className="flex items-center gap-2.5 min-w-0">
+                          <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
                               <FileText className="h-5 w-5 text-indigo-500 shrink-0" />
-                              <span className="text-xs text-slate-800 font-semibold truncate">{file.name}</span>
+                              <div className="min-w-0">
+                                <span className="text-xs text-slate-800 font-bold truncate block">{file.name}</span>
+                                <span className="text-[10px] text-slate-400 font-semibold uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                              </div>
                             </div>
-                            <span className="text-[10px] text-slate-400 font-bold shrink-0">{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                            
+                            <div className="flex items-center gap-2.5 flex-1 md:max-w-md w-full">
+                              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider shrink-0">Enviar a (Gmail):</span>
+                              <input 
+                                type="email"
+                                placeholder="estudiante@gmail.com"
+                                value={batchEmails[idx] || ""}
+                                onChange={(e) => {
+                                  const updated = [...batchEmails];
+                                  updated[idx] = e.target.value;
+                                  setBatchEmails(updated);
+                                }}
+                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-55 bg-slate-50/50"
+                              />
+                            </div>
                           </div>
                         ))}
                       </div>

@@ -12,7 +12,7 @@ export class DraftsService {
     @InjectQueue('draft-processing') private draftQueue: Queue,
   ) {}
 
-  async create(studentId: string, title: string, file: any) {
+  async create(studentId: string, title: string, file: any, recipientEmail?: string) {
     const objectName = await this.storageService.uploadFile(
       file.originalname,
       file.buffer,
@@ -26,6 +26,7 @@ export class DraftsService {
         fileName: file.originalname,
         fileUrl: objectName,
         fileType: file.mimetype,
+        recipientEmail,
       },
     });
 

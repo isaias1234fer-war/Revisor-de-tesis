@@ -72,6 +72,7 @@ model ThesisDraft {
   fileType    String
   status      String   @default("PENDING") // PENDING, ANALYZING, REVIEWED, REJECTED, APPROVED
   score       Float?
+  recipientEmail String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

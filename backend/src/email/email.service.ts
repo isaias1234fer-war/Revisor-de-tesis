@@ -1,0 +1,111 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
+
+@Injectable()
+export class EmailService {
+  private transporter: nodemailer.Transporter;
+
+  constructor(private configService: ConfigService) {
+    const host = this.configService.get('SMTP_HOST') || 'smtp.gmail.com';
+    const port = parseInt(this.configService.get('SMTP_PORT'), 10) || 587;
+    const user = this.configService.get('SMTP_USER');
+    const pass = this.configService.get('SMTP_PASS');
+
+    if (user && pass) {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465, // true for 465, false for other ports
+        auth: {
+          user,
+          pass,
+        },
+      });
+      console.log(`SMTP Mailer initialized successfully. Host: ${host}:${port}`);
+    } else {
+      console.warn('SMTP credentials not configured in .env. Email service will run in sandbox/simulation mode.');
+    }
+  }
+
+  async sendReport(
+    to: string,
+    draftTitle: string,
+    score: number | null,
+    pdfBuffer: Buffer,
+    studentName: string,
+  ): Promise<boolean> {
+    const from = this.configService.get('SMTP_FROM') || this.configService.get('SMTP_USER') || 'noreply@thesis-ia.com';
+    
+    const scoreText = score !== null ? `${score.toFixed(1)}/100` : 'Pendiente';
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #4f46e5; padding-bottom: 15px;">
+          <span style="font-size: 32px;">🎓</span>
+          <h2 style="color: #4f46e5; margin: 5px 0 0 0; font-weight: 800;">Tesis-IA</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 3px 0 0 0; font-weight: 600; uppercase; tracking-wider;">Reporte de Evaluación de Borrador</p>
+        </div>
+        
+        <p style="color: #1e293b; font-size: 16px; line-height: 1.6; margin-bottom: 12px;">
+          Estimado/a <strong>${studentName}</strong>,
+        </p>
+        <p style="color: #334155; font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+          Tu borrador de tesis titulado <strong style="color: #1e293b;">"${draftTitle}"</strong> ha sido analizado exitosamente por nuestro motor de inteligencia académica.
+        </p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin: 25px 0; text-align: center;">
+          <span style="display: block; font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Puntaje IA Obtenido</span>
+          <span style="font-size: 32px; font-weight: 900; color: ${score !== null && score >= 70 ? '#10b981' : '#f59e0b'};">${scoreText}</span>
+        </div>
+        
+        <p style="color: #334155; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+          Adjunto a este correo encontrarás el reporte formal detallado en formato <strong>PDF</strong> con todas las observaciones de originalidad, análisis de referencias y recomendaciones de mejora estructural.
+        </p>
+        
+        <div style="margin: 25px 0; padding: 12px 16px; background-color: #eef2ff; border-left: 4px solid #4f46e5; border-radius: 4px;">
+          <p style="color: #4338ca; font-size: 12px; margin: 0; line-height: 1.5; font-weight: 600;">
+            📱 ¡Optimizado para Móviles! Puedes visualizar el PDF adjunto directamente desde tu aplicación de Gmail o lector de archivos PDF en tu teléfono celular.
+          </p>
+        </div>
+        
+        <p style="color: #94a3b8; font-size: 11px; line-height: 1.5; margin-top: 35px; border-top: 1px solid #f1f5f9; padding-top: 15px; text-align: center;">
+          Este es un correo automático generado por el Sistema de Revisión de Tesis IA.<br/>
+          Por favor, no respondas a este mensaje.
+        </p>
+      </div>
+    `;
+
+    const cleanTitle = draftTitle.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+    const pdfFilename = `reporte_tesis_${cleanTitle}.pdf`;
+
+    if (!this.transporter) {
+      console.log(`[SIMULACIÓN DE CORREO]
+      Para: ${to}
+      Asunto: 📋 Reporte de Tesis: ${draftTitle} (${scoreText})
+      Adjunto: ${pdfFilename} (${pdfBuffer.length} bytes)
+      Detalle: Configura SMTP_USER y SMTP_PASS en tu archivo .env para enviar correos reales.`);
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Tesis-IA" <${from}>`,
+        to,
+        subject: `📋 Reporte de Tesis: "${draftTitle}" (${scoreText})`,
+        html: htmlContent,
+        attachments: [
+          {
+            filename: pdfFilename,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          },
+        ],
+      });
+      console.log(`Report successfully emailed to ${to}`);
+      return true;
+    } catch (error) {
+      console.error(`Failed to send email to ${to}:`, error.message);
+      return false;
+    }
+  }
+}

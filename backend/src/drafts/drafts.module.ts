@@ -7,6 +7,7 @@ import { DraftProcessor } from './drafts.processor';
 import { AiModule } from '../ai/ai.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ReportsModule } from '../reports/reports.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ReportsModule } from '../reports/reports.module';
     AiModule,
     PrismaModule,
     ReportsModule,
+    EmailModule,
     BullModule.registerQueue({
       name: 'draft-processing',
     }),

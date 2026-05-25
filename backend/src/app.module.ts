@@ -12,6 +12,7 @@ import { StorageModule } from './storage/storage.module';
 import { AiModule } from './ai/ai.module';
 import { BullModule } from '@nestjs/bullmq';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     StorageModule,
     AiModule,
     DashboardModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

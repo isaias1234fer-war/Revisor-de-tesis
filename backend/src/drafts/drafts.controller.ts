@@ -6,6 +6,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportsService } from '../reports/reports.service';
 import { AiService } from '../ai/ai.service';
+import { EmailService } from '../email/email.service';
 import { Response } from 'express';
 
 @ApiTags('drafts')
@@ -17,13 +18,14 @@ export class DraftsController {
     private draftsService: DraftsService,
     private prisma: PrismaService,
     private reportsService: ReportsService,
-    private aiService: AiService
+    private aiService: AiService,
+    private emailService: EmailService,
   ) {}
 
   @Get(':id/report')
   @Header('Content-Type', 'application/pdf')
   @ApiOperation({ summary: 'Generate and download the AI review report as PDF' })
-  async downloadReport(@Param('id') id: string, @Res() res: Response) {
+  async downloadReport(@Param('id') id: string, @Res() res: Response, @Req() req: any) {
     const draft = await this.prisma.thesisDraft.findUnique({
       where: { id },
       include: {
@@ -36,6 +38,25 @@ export class DraftsController {
 
     const pdfBuffer = await this.reportsService.generateDraftReport(draft);
     
+    // Enviar correo de forma asíncrona en segundo plano para no bloquear la descarga del navegador
+    const user = req.user;
+    if (user && user.userId) {
+      this.prisma.user.findUnique({ where: { id: user.userId } }).then(dbUser => {
+        if (dbUser && dbUser.email) {
+          console.log(`Enviando copia del reporte al correo personal: ${dbUser.email}`);
+          this.emailService.sendReport(
+            dbUser.email,
+            draft.title,
+            draft.score,
+            pdfBuffer,
+            dbUser.name || 'Estudiante'
+          );
+        }
+      }).catch(err => {
+        console.error('Error al obtener el correo del usuario para el reporte:', err.message);
+      });
+    }
+
     res.set({
       'Content-Disposition': `attachment; filename=reporte-tesis-${id}.pdf`,
       'Content-Length': pdfBuffer.length,
@@ -214,6 +235,7 @@ export class DraftsController {
   async uploadBatch(
     @UploadedFiles() files: any[],
     @Body('titles') titles: any,
+    @Body('emails') emails: any,
     @Req() req: any
   ) {
     const user = req.user;
@@ -233,6 +255,7 @@ export class DraftsController {
 
     const results = [];
     let parsedTitles: string[] = [];
+    let parsedEmails: string[] = [];
 
     if (titles) {
       if (Array.isArray(titles)) {
@@ -250,15 +273,32 @@ export class DraftsController {
       }
     }
 
+    if (emails) {
+      if (Array.isArray(emails)) {
+        parsedEmails = emails;
+      } else if (typeof emails === 'string') {
+        try {
+          if (emails.startsWith('[') && emails.endsWith(']')) {
+            parsedEmails = JSON.parse(emails);
+          } else {
+            parsedEmails = emails.split(',').map((e: string) => e.trim());
+          }
+        } catch {
+          parsedEmails = [emails];
+        }
+      }
+    }
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       let title = parsedTitles[i] || '';
+      const recipientEmail = parsedEmails[i] || '';
       
       if (!title) {
         title = file.originalname.replace(/\.[^/.]+$/, "");
       }
 
-      const draft = await this.draftsService.create(student.id, title, file);
+      const draft = await this.draftsService.create(student.id, title, file, recipientEmail);
       results.push(draft);
     }
 
